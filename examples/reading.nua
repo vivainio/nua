@@ -1,0 +1,11 @@
+-- Existing Lua can be read through the same CLI.
+def sum(values):
+  let total = 0
+  for _, value in ipairs(values):
+    total = total + value
+  return total
+let values = [10, 20, 30]
+if sum(values) > 50:
+  print("over fifty")
+else:
+  print("fifty or less")

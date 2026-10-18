@@ -1,0 +1,9 @@
+[package]
+name = "nua"
+version = "0.1.0"
+edition = "2024"
+description = "Bidirectional indentation syntax for Lua and Luau"
+repository = "https://github.com/vivainio/nua"
+
+[dependencies]
+full_moon = { version = "3.0.0", features = ["luau"] }

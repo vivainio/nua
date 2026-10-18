@@ -1,0 +1,24 @@
+-- Typed declarations, arrays, records, and indentation.
+type User = {
+  name: string,
+  score: number,
+}
+
+def greet(user: User) -> string:
+  return `Hello, {user.name}!`
+
+let users: {User} = [
+  {name = "Ada", score = 120},
+  {name = "Lin", score = 40},
+]
+
+for _, user in users:
+  if user.score >= 100:
+    print(greet(user))
+  elseif user.score > 0:
+    print("Keep going")
+  else:
+    continue
+
+let first = users[1]
+let label = if first.score >= 100 then "Expert" else "Beginner"

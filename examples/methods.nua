@@ -1,0 +1,21 @@
+-- Qualified definitions keep Lua's existing assignment semantics.
+let Counter = {}
+
+def Counter:increment(amount: number):
+  self.value += amount
+
+-- A bare def is local; global def explicitly declares a global function.
+global def announce(message: string):
+  print(message)
+
+-- Explicit empty bodies.
+def placeholder():
+  pass
+
+let count = 0
+repeat:
+  count += 1
+until count >= 3
+
+while count > 0:
+  count -= 1
