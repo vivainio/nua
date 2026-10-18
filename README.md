@@ -1,6 +1,6 @@
 # nua
 
-A small Rust CLI for reading and writing Lua/Luau with indentation, `let`, `def`, and array literals. Conversion works in both directions.
+A small Rust CLI for reading and writing Lua/Luau with indentation, `let`, `def`, and array literals. Conversion works in both directions. Emit Luau with types or erase types to target vanilla Lua 5.1.
 
 ```python
 def double(value: number) -> number:
@@ -40,10 +40,26 @@ cat existing.lua | ./target/release/nua from-lua
 Or install from this checkout with `cargo install --path .`.
 
 ```
-nua <to-luau|from-luau> [INPUT|-] [-o OUTPUT]
+nua <to-luau|to-lua|from-luau|from-lua|strip-types> [INPUT|-] [-o OUTPUT]
 ```
 
-Input defaults to stdin; output defaults to stdout. `-` explicitly selects stdin/stdout. `to-lua` and `from-lua` are aliases. The output dialect is Luau: the aliases do not erase types or lower Luau features to stock Lua.
+Input defaults to stdin; output defaults to stdout. `-` explicitly selects stdin/stdout. `from-lua` is an alias for `from-luau`. `to-luau` preserves types; `to-lua` erases them and validates the result as Lua 5.1. `strip-types` accepts existing Lua/Luau directly and emits Lua 5.1.
+
+## Vanilla Lua output
+
+```sh
+# nua -> vanilla Lua 5.1
+nua to-lua examples/vanilla.nua -o /tmp/vanilla.lua
+
+# Existing Luau -> vanilla Lua 5.1
+nua strip-types examples/vanilla.luau -o /tmp/stripped.lua
+```
+
+Both paths remove parameter, variable, loop, and return annotations, generic declarations and instantiations, type aliases (including exported aliases), type functions, and `::` assertions. Comments, string contents, and line breaks are preserved during erasure. See the same example as [nua](examples/vanilla.nua), [typed Luau](examples/vanilla.luau), and [vanilla Lua](examples/vanilla.lua).
+
+This is type erasure, not full Luau runtime compatibility. The Lua target rejects compound assignment, `continue`, backtick strings, inline conditional expressions, and generalized table iteration. It also rejects Luau-only number formats and string escapes that could change meaning in Lua 5.1. Other unsupported syntax is caught by the Lua 5.1 parser. Failed conversions emit no partial output and leave existing output files untouched.
+
+For generic loops, use explicit Lua iterator calls such as `pairs(items)` / `ipairs(items)`, or iterator/state/control tuples such as `next, items`. A lone iterator variable is conservatively rejected because it cannot be distinguished from a table requiring Luau generalized iteration. Iterator calls must return Lua-compatible iterators. Type erasure does not replace Luau/Roblox APIs with Lua equivalents.
 
 ## Syntax
 
@@ -73,19 +89,20 @@ Array literals create ordinary Lua tables, with one-based indexing. `items[1]` s
 
 Lua long strings remain supported. `[[...]]` is reserved for a long string, so separate nested list openers with a space: `[ [1, 2], [3, 4] ]`. The reverse converter inserts this space automatically.
 
-Comments (`--`, `--[[...]]`), strings, interpolation, explicit `return`, `and`/`or`/`not`, `~=`, `..`, retain their existing syntax. Inline conditional expressions also use `elif`, keeping `then` and `else`: `if x then 1 elif y then 2 else 3`. Escape Lua identifiers that collide with nua's new words using `@let`, `@def`, `@global`, `@pass`, or `@elif`; the reverse converter does this automatically.
+Comments (`--`, `--[[...]]`), strings, interpolation, explicit `return`, `and`/`or`/`not`, `~=`, and `..` retain their existing syntax. Inline conditional expressions also use `elif`, keeping `then` and `else`: `if x then 1 elif y then 2 else 3`. Escape Lua identifiers that collide with nua's new words using `@let`, `@def`, `@global`, `@pass`, or `@elif`; the reverse converter does this automatically.
 
 Python highlighting is a useful approximation for `def`, indentation, and shared keywords. Lua comments, `let`, Luau types, and strings need a dedicated nua grammar for accurate highlighting.
 
 ## Paired transpilation examples
 
-The first three `.luau` files are the checked-in output of their `.nua` partners. The last pair demonstrates reading existing Lua:
+The `.luau` files are the checked-in output of their `.nua` partners. The reading pair demonstrates the reverse direction; the vanilla example also has type-free `.lua` output:
 
 | Example | nua source | Generated Luau |
 | --- | --- | --- |
 | Typed records, arrays, branching, iteration | [basics.nua](examples/basics.nua) | [basics.luau](examples/basics.luau) |
 | Generic map, callbacks, type packs | [generics.nua](examples/generics.nua) | [generics.luau](examples/generics.luau) |
 | Methods, globals, empty bodies, loops | [methods.nua](examples/methods.nua) | [methods.luau](examples/methods.luau) |
+| Lua 5.1 output (also [vanilla.lua](examples/vanilla.lua)) | [vanilla.nua](examples/vanilla.nua) | [vanilla.luau](examples/vanilla.luau) |
 | Read existing Lua (reverse direction) | [reading.nua](examples/reading.nua) | [reading.lua](examples/reading.lua) |
 
 ```sh
@@ -97,7 +114,7 @@ nua from-luau examples/generics.luau
 
 This is an experimental first implementation targeting Lua 5.1 and Luau. Lua 5.2–5.4 extensions are not enabled. Conversion normalizes layout; it does not reproduce the original formatting byte for byte.
 
-The reverse direction uses the `full_moon` Luau parser. Every reverse conversion is transpiled back and its syntax tree compared with the original before output is returned. Unsupported constructs fail explicitly rather than returning a changed tree. This is a syntax check, not Luau type checking or execution. Advanced constructs such as type functions and functions embedded in block conditions are not supported yet. New array syntax inside backtick interpolation expressions is not transformed.
+The reverse direction uses the `full_moon` Luau parser. Every reverse conversion is transpiled back and its syntax tree compared with the original before output is returned. Unsupported constructs fail explicitly rather than returning a changed tree. This is a syntax check, not Luau type checking or execution. The reverse direction does not yet support advanced constructs such as type functions and functions embedded in block conditions. `strip-types` can erase type functions directly from existing Luau. New array syntax inside backtick interpolation expressions is not transformed.
 
 ```sh
 cargo test
@@ -106,3 +123,5 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 Tests cover both CLI directions, file output, invalid input, the paired examples, and syntax-tree round trips for blocks, callbacks, multiline headers, comments, long strings, tables, arrays, generics, and type packs.
+
+Language design candidates and references: [ideas from other compile-to-Lua languages](docs/language-ideas.md).

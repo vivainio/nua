@@ -1,0 +1,15 @@
+-- This example can target either Luau or vanilla Lua 5.1.
+export type Mapper<T, U> = (T) -> U
+
+def map<T, U>(items: {T}, transform: Mapper<T, U>) -> {U}:
+  let result: {U} = []
+  for i, item in ipairs(items):
+    result[i] = transform(item)
+  return result
+
+let doubled: {number} = map([1, 2, 3], def(value: number) -> number:
+  return value * 2
+)
+
+for _, value in ipairs(doubled):
+  print(value)

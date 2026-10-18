@@ -4,7 +4,7 @@ use std::{
     process::ExitCode,
 };
 
-const HELP: &str = "nua — bidirectional indentation syntax for Lua/Luau\n\nUsage: nua <to-luau|from-luau> [INPUT|-] [-o OUTPUT]\n\nInput defaults to stdin; output defaults to stdout.\nAliases: to-lua, from-lua.\n\nExamples:\n  nua to-luau game.nua -o game.luau\n  nua from-luau game.luau -o game.nua\n  cat game.lua | nua from-lua\n";
+const HELP: &str = "nua — bidirectional indentation syntax for Lua/Luau\n\nUsage: nua <to-luau|to-lua|from-luau|from-lua|strip-types> [INPUT|-] [-o OUTPUT]\n\nInput defaults to stdin; output defaults to stdout.\nto-lua and strip-types emit Lua 5.1; from-lua is an alias for from-luau.\n\nExamples:\n  nua to-luau game.nua -o game.luau\n  nua to-lua game.nua -o game.lua\n  nua strip-types game.luau -o game.lua\n  nua from-luau game.luau -o game.nua\n  cat game.lua | nua from-lua\n";
 
 fn run() -> Result<(), String> {
     let mut args = env::args().skip(1);
@@ -19,7 +19,7 @@ fn run() -> Result<(), String> {
     }
     if !matches!(
         command.as_str(),
-        "to-luau" | "to-lua" | "from-luau" | "from-lua"
+        "to-luau" | "to-lua" | "from-luau" | "from-lua" | "strip-types"
     ) {
         return Err(format!("unknown command: {command}\n\n{HELP}"));
     }
@@ -57,10 +57,11 @@ fn run() -> Result<(), String> {
         }
         Some(path) => fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?,
     };
-    let converted = if command.starts_with("from-") {
-        nua::from_luau(&source)
-    } else {
-        nua::to_luau(&source)
+    let converted = match command.as_str() {
+        "to-lua" => nua::to_lua(&source),
+        "strip-types" => nua::strip_types(&source),
+        "from-lua" | "from-luau" => nua::from_luau(&source),
+        _ => nua::to_luau(&source),
     }?;
     match output.as_deref() {
         None | Some("-") => io::stdout()

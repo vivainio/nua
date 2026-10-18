@@ -1,10 +1,12 @@
 //! Bidirectional indentation syntax for Lua/Luau.
+mod lua;
 use full_moon::{
     ast,
     node::Node,
     tokenizer::{TokenReference, TokenType},
     visitors::Visitor,
 };
+pub use lua::{strip_types, to_lua};
 use std::collections::HashMap;
 
 fn pos(t: &TokenReference) -> usize {

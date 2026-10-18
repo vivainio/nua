@@ -40,7 +40,7 @@ fn errors_are_nonzero_and_do_not_emit_partial_output() {
 }
 #[test]
 fn file_output_and_examples() {
-    for name in ["basics", "generics", "methods"] {
+    for name in ["basics", "generics", "methods", "vanilla"] {
         let source = std::fs::read_to_string(format!("examples/{name}.nua")).unwrap();
         let expected = std::fs::read_to_string(format!("examples/{name}.luau")).unwrap();
         assert_eq!(nua::to_luau(&source).unwrap(), expected);
@@ -68,4 +68,46 @@ fn reading_example() {
     let lua = std::fs::read_to_string("examples/reading.lua").unwrap();
     let expected = std::fs::read_to_string("examples/reading.nua").unwrap();
     assert_eq!(nua::from_luau(&lua).unwrap(), expected);
+}
+
+#[test]
+fn vanilla_output_and_strip_types_commands() {
+    let source = std::fs::read_to_string("examples/vanilla.nua").unwrap();
+    let luau = std::fs::read_to_string("examples/vanilla.luau").unwrap();
+    let expected = std::fs::read_to_string("examples/vanilla.lua").unwrap();
+    for (command, input) in [("to-lua", source), ("strip-types", luau)] {
+        let output = cli(command, &input);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(String::from_utf8(output.stdout).unwrap(), expected);
+    }
+    let output = cli("to-luau", "let x: number = 1\n");
+    assert!(String::from_utf8_lossy(&output.stdout).contains(": number"));
+    let output = cli("strip-types", "local x: number = 1; x += 1");
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("compound assignment"));
+}
+
+#[test]
+fn failed_lua_conversion_preserves_existing_output_file() {
+    let dir = std::env::temp_dir().join(format!("nua-lua-error-test-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("input.luau");
+    let output = dir.join("output.lua");
+    std::fs::write(&input, "local s: string = `hi`").unwrap();
+    std::fs::write(&output, "original").unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_nua"))
+        .arg("strip-types")
+        .arg(&input)
+        .arg("-o")
+        .arg(&output)
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert_eq!(std::fs::read_to_string(output).unwrap(), "original");
+    std::fs::remove_dir_all(dir).unwrap();
 }
