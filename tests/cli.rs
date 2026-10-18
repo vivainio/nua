@@ -40,7 +40,7 @@ fn errors_are_nonzero_and_do_not_emit_partial_output() {
 }
 #[test]
 fn file_output_and_examples() {
-    for name in ["basics", "generics", "methods", "vanilla"] {
+    for name in ["basics", "generics", "methods", "vanilla", "data"] {
         let source = std::fs::read_to_string(format!("examples/{name}.nua")).unwrap();
         let expected = std::fs::read_to_string(format!("examples/{name}.luau")).unwrap();
         assert_eq!(nua::to_luau(&source).unwrap(), expected);

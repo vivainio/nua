@@ -1,144 +1,9 @@
 //! Bidirectional indentation syntax for Lua/Luau.
 mod lua;
-use full_moon::{
-    ast,
-    node::Node,
-    tokenizer::{TokenReference, TokenType},
-    visitors::Visitor,
-};
+mod reverse;
+use full_moon::ast;
 pub use lua::{strip_types, to_lua};
-use std::collections::HashMap;
-
-fn pos(t: &TokenReference) -> usize {
-    t.token().start_position().bytes()
-}
-#[derive(Default)]
-struct Change {
-    text: Option<String>,
-    close: bool,
-    open: bool,
-    empty: bool,
-    statement: bool,
-}
-#[derive(Default)]
-struct Reverse {
-    edits: HashMap<usize, Change>,
-}
-impl Reverse {
-    fn text(&mut self, t: &TokenReference, s: &str) {
-        self.edits.entry(pos(t)).or_default().text = Some(s.into());
-    }
-    fn open(&mut self, t: &TokenReference, b: &ast::Block) {
-        let e = self.edits.entry(pos(t)).or_default();
-        e.open = true;
-        e.empty = b.tokens().next().is_none();
-    }
-    fn close(&mut self, t: &TokenReference, remove: bool) {
-        self.edits.entry(pos(t)).or_default().close = true;
-        if remove {
-            self.text(t, "");
-        }
-    }
-}
-impl Visitor for Reverse {
-    fn visit_block(&mut self, n: &ast::Block) {
-        for stmt in n.stmts() {
-            if let Some(t) = stmt.tokens().min_by_key(|t| pos(t)) {
-                self.edits.entry(pos(t)).or_default().statement = true;
-            }
-        }
-        if let Some(stmt) = n.last_stmt()
-            && let Some(t) = stmt.tokens().min_by_key(|t| pos(t))
-        {
-            self.edits.entry(pos(t)).or_default().statement = true;
-        }
-    }
-    fn visit_function_args(&mut self, n: &ast::FunctionArgs) {
-        if let ast::FunctionArgs::TableConstructor(t) = n {
-            self.text(t.braces().tokens().0, "{");
-            self.text(t.braces().tokens().1, "}");
-        }
-    }
-    fn visit_table_constructor(&mut self, n: &ast::TableConstructor) {
-        if n.fields().iter().all(|f| matches!(f, ast::Field::NoKey(_)))
-            && !self.edits.contains_key(&pos(n.braces().tokens().0))
-        {
-            self.text(n.braces().tokens().0, "[");
-            self.text(n.braces().tokens().1, "]");
-        }
-    }
-    fn visit_local_assignment(&mut self, n: &ast::LocalAssignment) {
-        self.text(n.local_token(), "let");
-    }
-    fn visit_local_function(&mut self, n: &ast::LocalFunction) {
-        self.text(n.local_token(), "");
-        self.text(n.function_token(), "def");
-    }
-    fn visit_function_declaration(&mut self, n: &ast::FunctionDeclaration) {
-        self.text(n.function_token(), "global def");
-    }
-    fn visit_anonymous_function(&mut self, n: &ast::AnonymousFunction) {
-        self.text(n.function_token(), "def");
-    }
-    fn visit_function_body(&mut self, n: &ast::FunctionBody) {
-        let last = if let Some(r) = n.return_type() {
-            self.text(r.punctuation(), "->");
-            r.type_info().tokens().max_by_key(|t| pos(t)).unwrap()
-        } else {
-            n.parameters_parentheses().tokens().1
-        };
-        self.open(last, n.block());
-        self.close(n.end_token(), true);
-    }
-    fn visit_if(&mut self, n: &ast::If) {
-        self.text(n.then_token(), "");
-        let last = n.condition().tokens().max_by_key(|t| pos(t)).unwrap();
-        self.open(last, n.block());
-        if let Some(t) = n.else_token() {
-            self.close(t, false);
-            self.open(t, n.else_block().unwrap());
-        }
-        self.close(n.end_token(), true);
-    }
-    fn visit_else_if(&mut self, n: &ast::ElseIf) {
-        self.close(n.else_if_token(), false);
-        self.text(n.else_if_token(), "elif");
-        self.text(n.then_token(), "");
-        self.open(
-            n.condition().tokens().max_by_key(|t| pos(t)).unwrap(),
-            n.block(),
-        );
-    }
-    fn visit_else_if_expression(&mut self, n: &ast::luau::ElseIfExpression) {
-        self.text(n.else_if_token(), "elif");
-    }
-    fn visit_while(&mut self, n: &ast::While) {
-        self.text(n.do_token(), "");
-        self.open(
-            n.condition().tokens().max_by_key(|t| pos(t)).unwrap(),
-            n.block(),
-        );
-        self.close(n.end_token(), true);
-    }
-    fn visit_numeric_for(&mut self, n: &ast::NumericFor) {
-        self.text(n.do_token(), ":");
-        self.open(n.do_token(), n.block());
-        self.close(n.end_token(), true);
-    }
-    fn visit_generic_for(&mut self, n: &ast::GenericFor) {
-        self.text(n.do_token(), ":");
-        self.open(n.do_token(), n.block());
-        self.close(n.end_token(), true);
-    }
-    fn visit_do(&mut self, n: &ast::Do) {
-        self.open(n.do_token(), n.block());
-        self.close(n.end_token(), true);
-    }
-    fn visit_repeat(&mut self, n: &ast::Repeat) {
-        self.open(n.repeat_token(), n.block());
-        self.close(n.until_token(), false);
-    }
-}
+pub use reverse::from_luau;
 
 fn parse(s: &str) -> Result<ast::Ast, String> {
     full_moon::parse(s).map_err(|errors| {
@@ -148,127 +13,6 @@ fn parse(s: &str) -> Result<ast::Ast, String> {
             .collect::<Vec<_>>()
             .join("\n")
     })
-}
-
-/// Convert Lua/Luau to nua using structural AST boundaries. Formatting is normalized.
-pub fn from_luau(source: &str) -> Result<String, String> {
-    let tree = parse(source)?;
-    let mut reverse = Reverse::default();
-    reverse.visit_ast(&tree);
-    let mut out = String::new();
-    let mut depth = 0usize;
-    fn newline(out: &mut String) {
-        while out.ends_with(' ') {
-            out.pop();
-        }
-        if !out.is_empty() && !out.ends_with('\n') {
-            out.push('\n');
-        }
-    }
-    fn emit(out: &mut String, text: &str, depth: usize) {
-        if text.is_empty() {
-            return;
-        }
-        if out.is_empty() || out.ends_with('\n') {
-            out.push_str(&"  ".repeat(depth));
-        }
-        out.push_str(text);
-    }
-    let mut refs: Vec<_> = tree
-        .nodes()
-        .tokens()
-        .chain(std::iter::once(tree.eof()))
-        .collect();
-    refs.sort_by_key(|t| pos(t));
-    refs.dedup_by_key(|t| pos(t));
-    for t in refs {
-        for trivia in t.leading_trivia() {
-            let s = trivia.to_string();
-            if s.trim().is_empty() {
-                if s.contains('\n') {
-                    newline(&mut out);
-                } else if !out.ends_with([' ', '\n']) && !out.is_empty() {
-                    out.push(' ');
-                }
-            } else {
-                emit(&mut out, &s, depth);
-                if s.starts_with("--") && !s.starts_with("--[") {
-                    newline(&mut out);
-                }
-            }
-        }
-        let edit = reverse.edits.get(&pos(t));
-        if edit.is_some_and(|e| e.statement) {
-            newline(&mut out);
-        }
-        if edit.is_some_and(|e| e.close) {
-            depth = depth.checked_sub(1).ok_or("invalid block nesting")?;
-            newline(&mut out);
-        }
-        let original = t.token().to_string();
-        let escaped;
-        let text = if edit.and_then(|e| e.text.as_deref()).is_none()
-            && matches!(t.token().token_type(), TokenType::Identifier { .. })
-            && matches!(
-                original.as_str(),
-                "let" | "def" | "global" | "pass" | "elif"
-            ) {
-            escaped = format!("@{original}");
-            &escaped
-        } else {
-            edit.and_then(|e| e.text.as_deref()).unwrap_or(&original)
-        };
-        if text == "[" && out.ends_with('[') {
-            out.push(' ');
-        }
-        if text == ":" {
-            while out.ends_with(' ') {
-                out.pop();
-            }
-        }
-        if text == "->" && !out.ends_with([' ', '\n']) {
-            out.push(' ');
-        }
-        emit(&mut out, text, depth);
-        if edit.is_some_and(|e| e.open) {
-            if !text.ends_with(':') {
-                out.push(':');
-            }
-            depth += 1;
-            // Defer the newline until after header comments.
-        }
-        for trivia in t.trailing_trivia() {
-            let s = trivia.to_string();
-            if s.trim().is_empty() {
-                if s.contains('\n') {
-                    newline(&mut out);
-                } else if !out.ends_with([' ', '\n']) && !out.is_empty() {
-                    out.push(' ');
-                }
-            } else {
-                emit(&mut out, &s, depth);
-                if s.starts_with("--") && !s.starts_with("--[") {
-                    newline(&mut out);
-                }
-            }
-        }
-        if edit.is_some_and(|e| e.open) {
-            newline(&mut out);
-            if edit.is_some_and(|e| e.empty) {
-                emit(&mut out, "pass", depth);
-                newline(&mut out);
-            }
-        }
-    }
-    newline(&mut out);
-    let back =
-        to_luau(&out).map_err(|e| format!("cannot represent this source in nua yet: {e}"))?;
-    if !tree.nodes().similar(parse(&back)?.nodes()) {
-        return Err(
-            "conversion would change the syntax tree; this construct is not supported yet".into(),
-        );
-    }
-    Ok(out)
 }
 
 // Mask lexical literals and comments, retaining byte offsets and newlines.
@@ -391,15 +135,16 @@ pub fn to_luau(source: &str) -> Result<String, String> {
         let line = line.as_str();
         let m = m.as_str();
         let indent = line.len() - line.trim_start_matches(' ').len();
-        if line[indent..].starts_with('\t') {
-            return Err(format!("line {num}: use spaces for indentation"));
-        }
         let code = m.trim();
         if code.is_empty() {
             out.push_str(line);
             out.push('\n');
             continue;
         }
+        if line[indent..].starts_with('\t') {
+            return Err(format!("line {num}: use spaces for indentation"));
+        }
+        let mut join_closing_function = false;
         let continuation = delimiter_depth > stack.last().map_or(0, |f| f.delimiter_base);
         if !continuation {
             let branch = code == "else:" || code.starts_with("elif ");
@@ -421,10 +166,17 @@ pub fn to_luau(source: &str) -> Result<String, String> {
                     }
                 } else {
                     out.push_str(&" ".repeat(frame.indent));
-                    out.push_str("end\n");
+                    out.push_str("end");
+                    if frame.kind == "def" && code.starts_with(')') {
+                        join_closing_function = true;
+                    } else {
+                        out.push('\n');
+                    }
                 }
             }
-            if let Some(frame) = stack.last_mut() {
+            if delimiter_depth > stack.last().map_or(0, |f| f.delimiter_base) {
+                // Closing a callback resumes the containing table or argument list.
+            } else if let Some(frame) = stack.last_mut() {
                 match frame.body {
                     None => frame.body = Some(indent),
                     Some(n) if n != indent => {
@@ -542,14 +294,21 @@ pub fn to_luau(source: &str) -> Result<String, String> {
             return Err(format!("line {num}: def header must end with ':'"));
         }
         if code == "pass" {
-            text = format!("{}-- pass", " ".repeat(indent));
+            text.replace_range(indent..indent + 4, "");
+            if text.trim().is_empty() {
+                continue;
+            }
         } else {
             edits.sort_by_key(|e| e.0);
             for (a, b, s) in edits.into_iter().rev() {
                 text.replace_range(a..b, &s);
             }
         }
-        out.push_str(&text);
+        out.push_str(if join_closing_function {
+            text.trim_start()
+        } else {
+            &text
+        });
         out.push('\n');
         for c in code.bytes() {
             match c {

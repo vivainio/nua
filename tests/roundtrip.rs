@@ -1,10 +1,35 @@
 use full_moon::node::Node;
+struct Comparable;
+impl full_moon::visitors::VisitorMut for Comparable {
+    fn visit_block(&mut self, n: full_moon::ast::Block) -> full_moon::ast::Block {
+        let statements = n.stmts().cloned().map(|s| (s, None)).collect();
+        let last = n.last_stmt().cloned().map(|s| (s, None));
+        n.with_stmts(statements).with_last_stmt(last)
+    }
+    fn visit_expression(&mut self, n: full_moon::ast::Expression) -> full_moon::ast::Expression {
+        match n {
+            full_moon::ast::Expression::Parentheses { expression, .. }
+                if matches!(*expression, full_moon::ast::Expression::Function(_)) =>
+            {
+                *expression
+            }
+            _ => n,
+        }
+    }
+}
+use full_moon::visitors::VisitorMut;
 fn roundtrip(lua: &str) {
     let nua = nua::from_luau(lua).unwrap();
     let back = nua::to_luau(&nua).unwrap_or_else(|e| panic!("{e}\nNUA:\n{nua}"));
     let a = full_moon::parse(lua).unwrap();
     let b = full_moon::parse(&back).unwrap();
-    assert!(a.nodes().similar(b.nodes()), "NUA:\n{nua}\nBACK:\n{back}");
+    assert!(
+        Comparable
+            .visit_ast(a)
+            .nodes()
+            .similar(Comparable.visit_ast(b).nodes()),
+        "NUA:\n{nua}\nBACK:\n{back}"
+    );
 }
 #[test]
 fn lua_control_flow() {

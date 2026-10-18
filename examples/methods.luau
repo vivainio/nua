@@ -12,7 +12,6 @@ function announce(message: string)
 -- Explicit empty bodies.
 end
 local function placeholder()
-  -- pass
 
 end
 local count = 0

@@ -11,8 +11,7 @@ local function map(items, transform)
 end
 local doubled = map({1, 2, 3}, function(value)
   return value * 2
-end
-)
+end)
 
 for _, value in ipairs(doubled) do
   print(value)

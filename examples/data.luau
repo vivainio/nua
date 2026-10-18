@@ -1,0 +1,40 @@
+-- Records, arrays, type shapes, and callback fields keep their structure.
+export type Job = {
+  name: string,
+  options: {
+    labels: {string},
+    metadata: {[string]: string},
+  },
+}
+
+local settings = {
+  name = "worker",
+  retry = {
+    attempts = 3,
+    delays = {1, 2, 5},
+  },
+  metadata = {},
+}
+
+local handlers = {
+  run = (function(job: Job) : string
+    if #job.options.labels > 0 then
+      return job.name
+    end
+    return "idle"
+  end),
+}
+
+local jobs: {Job} = {
+  {
+    name = settings.name,
+    options = {
+      labels = {"scheduled", "daily"},
+      metadata = settings.metadata,
+    },
+  },
+}
+
+for _, job in ipairs(jobs) do
+  print(handlers.run(job))
+end

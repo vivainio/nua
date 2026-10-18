@@ -4,6 +4,7 @@ def sum(values):
   for _, value in ipairs(values):
     total = total + value
   return total
+
 let values = [10, 20, 30]
 if sum(values) > 50:
   print("over fifty")

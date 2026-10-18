@@ -11,8 +11,7 @@ local function map<T, U>(items: {T}, transform: Mapper<T, U>) : {U}
 end
 local doubled: {number} = map({1, 2, 3}, function(value: number) : number
   return value * 2
-end
-)
+end)
 
 for _, value in ipairs(doubled) do
   print(value)

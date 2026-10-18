@@ -76,7 +76,7 @@ For generic loops, use explicit Lua iterator calls such as `pairs(items)` / `ipa
 | `while condition:` | `while condition do … end` |
 | `repeat:` / `until condition` | `repeat … until condition` |
 | `do:` | `do … end` |
-| `pass` | Empty body (emits a comment) |
+| `pass` | Empty body |
 | `[1, 2, 3]` | `{1, 2, 3}` |
 
 Use spaces for indentation. Indentation width can vary between blocks, but sibling statements must align. Bodies must be indented; use `pass` for an empty body. Bare `def` declarations are local. Qualified definitions (`def Object.method` or `def Object:method`) preserve Lua's assignment semantics.
@@ -85,13 +85,34 @@ Use spaces for indentation. Indentation width can vary between blocks, but sibli
 
 Luau type syntax stays intact: `{T}`, `{[string]: T}`, optional types, unions, intersections, generics, function types, type packs, `typeof`, and `::` assertions. Only a function definition's return annotation changes from `: T` to `-> T`. Function types already use `->`.
 
-Array literals create ordinary Lua tables, with one-based indexing. `items[1]` stays indexing. Records and dictionaries keep braces: `{name = "Ada"}` and `{[key] = value}`. Record fields always use explicit `key = value`; there is no field shorthand. The reverse converter renders tables containing only positional fields as arrays, including empty tables. Mixed tables keep braces. Table-call shorthand such as `print {1, 2}` also keeps braces.
+Array literals create ordinary Lua tables, with one-based indexing. `items[1]` stays indexing. Records and dictionaries keep braces: `{name = "Ada"}` and `{[key] = value}`. Record fields always use explicit `key = value`; there is no field shorthand. The reverse converter renders nonempty tables containing only positional fields as arrays. Empty tables remain `{}` because their intended role cannot be inferred. Mixed tables keep braces. Table-call shorthand such as `print {1, 2}` also keeps braces.
 
 Lua long strings remain supported. `[[...]]` is reserved for a long string, so separate nested list openers with a space: `[ [1, 2], [3, 4] ]`. The reverse converter inserts this space automatically.
 
 Comments (`--`, `--[[...]]`), strings, interpolation, explicit `return`, `and`/`or`/`not`, `~=`, and `..` retain their existing syntax. Inline conditional expressions also use `elif`, keeping `then` and `else`: `if x then 1 elif y then 2 else 3`. Escape Lua identifiers that collide with nua's new words using `@let`, `@def`, `@global`, `@pass`, or `@elif`; the reverse converter does this automatically.
 
 Python highlighting is a useful approximation for `def`, indentation, and shared keywords. Lua comments, `let`, Luau types, and strings need a dedicated nua grammar for accurate highlighting.
+
+## Reading formatted data
+
+Reverse conversion preserves blank lines and inline spacing, normalizes indentation to two spaces, and indents nested records, arrays, argument lists, and type shapes. Inline literals stay inline. Comments and literal contents are retained. Qualified definitions use `def Object.method` / `def Object:method`; only bare global function definitions need `global def`.
+
+Callbacks used as record fields or followed by another argument may be grouped in parentheses so their closing delimiter and comma stay together:
+
+```python
+let options = {
+  retry = {
+    attempts = 3,
+    delays = [1, 2, 5],
+  },
+  metadata = {},
+  handler = (def(event):
+    return {received = event}
+  ),
+}
+```
+
+See the [data example](examples/data.nua) and its [Luau output](examples/data.luau).
 
 ## Paired transpilation examples
 
@@ -103,6 +124,7 @@ The `.luau` files are the checked-in output of their `.nua` partners. The readin
 | Generic map, callbacks, type packs | [generics.nua](examples/generics.nua) | [generics.luau](examples/generics.luau) |
 | Methods, globals, empty bodies, loops | [methods.nua](examples/methods.nua) | [methods.luau](examples/methods.luau) |
 | Lua 5.1 output (also [vanilla.lua](examples/vanilla.lua)) | [vanilla.nua](examples/vanilla.nua) | [vanilla.luau](examples/vanilla.luau) |
+| Nested data, type shapes, callback fields | [data.nua](examples/data.nua) | [data.luau](examples/data.luau) |
 | Read existing Lua (reverse direction) | [reading.nua](examples/reading.nua) | [reading.lua](examples/reading.lua) |
 
 ```sh
@@ -114,7 +136,7 @@ nua from-luau examples/generics.luau
 
 This is an experimental first implementation targeting Lua 5.1 and Luau. Lua 5.2–5.4 extensions are not enabled. Conversion normalizes layout; it does not reproduce the original formatting byte for byte.
 
-The reverse direction uses the `full_moon` Luau parser. Every reverse conversion is transpiled back and its syntax tree compared with the original before output is returned. Unsupported constructs fail explicitly rather than returning a changed tree. This is a syntax check, not Luau type checking or execution. The reverse direction does not yet support advanced constructs such as type functions and functions embedded in block conditions. `strip-types` can erase type functions directly from existing Luau. New array syntax inside backtick interpolation expressions is not transformed.
+The reverse direction uses the `full_moon` Luau parser. Every reverse conversion is transpiled back and its syntax tree compared with the original after normalizing optional semicolons and parentheses around function literals before output is returned. Unsupported constructs fail explicitly rather than returning a changed tree. This is a syntax check, not Luau type checking or execution. The reverse direction does not yet support advanced constructs such as type functions and functions embedded in block conditions. `strip-types` can erase type functions directly from existing Luau. New array syntax inside backtick interpolation expressions is not transformed.
 
 ```sh
 cargo test
