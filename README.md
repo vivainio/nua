@@ -55,7 +55,7 @@ Input defaults to stdin; output defaults to stdout. `-` explicitly selects stdin
 | `def Object:method(x):` | `function Object:method(x) … end` |
 | `let f = def(x):` | `local f = function(x) … end` |
 | `if condition:` | `if condition then … end` |
-| `elseif condition:` / `else:` | `elseif condition then` / `else` |
+| `elif condition:` / `else:` | `elseif condition then` / `else` |
 | `for i, x in items:` | `for i, x in items do … end` |
 | `while condition:` | `while condition do … end` |
 | `repeat:` / `until condition` | `repeat … until condition` |
@@ -73,7 +73,7 @@ Array literals create ordinary Lua tables, with one-based indexing. `items[1]` s
 
 Lua long strings remain supported. `[[...]]` is reserved for a long string, so separate nested list openers with a space: `[ [1, 2], [3, 4] ]`. The reverse converter inserts this space automatically.
 
-Comments (`--`, `--[[...]]`), strings, interpolation, explicit `return`, `and`/`or`/`not`, `~=`, `..`, and inline Luau conditional expressions retain their existing syntax. Escape Lua identifiers that collide with nua's new words using `@let`, `@def`, `@global`, or `@pass`; the reverse converter does this automatically.
+Comments (`--`, `--[[...]]`), strings, interpolation, explicit `return`, `and`/`or`/`not`, `~=`, `..`, retain their existing syntax. Inline conditional expressions also use `elif`, keeping `then` and `else`: `if x then 1 elif y then 2 else 3`. Escape Lua identifiers that collide with nua's new words using `@let`, `@def`, `@global`, `@pass`, or `@elif`; the reverse converter does this automatically.
 
 Python highlighting is a useful approximation for `def`, indentation, and shared keywords. Lua comments, `let`, Luau types, and strings need a dedicated nua grammar for accurate highlighting.
 

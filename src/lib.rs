@@ -100,11 +100,15 @@ impl Visitor for Reverse {
     }
     fn visit_else_if(&mut self, n: &ast::ElseIf) {
         self.close(n.else_if_token(), false);
+        self.text(n.else_if_token(), "elif");
         self.text(n.then_token(), "");
         self.open(
             n.condition().tokens().max_by_key(|t| pos(t)).unwrap(),
             n.block(),
         );
+    }
+    fn visit_else_if_expression(&mut self, n: &ast::luau::ElseIfExpression) {
+        self.text(n.else_if_token(), "elif");
     }
     fn visit_while(&mut self, n: &ast::While) {
         self.text(n.do_token(), "");
@@ -203,8 +207,10 @@ pub fn from_luau(source: &str) -> Result<String, String> {
         let escaped;
         let text = if edit.and_then(|e| e.text.as_deref()).is_none()
             && matches!(t.token().token_type(), TokenType::Identifier { .. })
-            && matches!(original.as_str(), "let" | "def" | "global" | "pass")
-        {
+            && matches!(
+                original.as_str(),
+                "let" | "def" | "global" | "pass" | "elif"
+            ) {
             escaped = format!("@{original}");
             &escaped
         } else {
@@ -339,7 +345,7 @@ fn logical_lines(source: &str, masked: &str) -> Vec<(usize, String, String)> {
             || mask.contains("def(")
             || mask.contains("def (")
             || mask.contains(" def ")
-            || ["if ", "elseif ", "while ", "for "]
+            || ["if ", "elif ", "while ", "for "]
                 .iter()
                 .any(|s| mask.trim_start().starts_with(s));
         let balance = |s: &str| {
@@ -394,7 +400,7 @@ pub fn to_luau(source: &str) -> Result<String, String> {
         }
         let continuation = delimiter_depth > stack.last().map_or(0, |f| f.delimiter_base);
         if !continuation {
-            let branch = code == "else:" || code.starts_with("elseif ");
+            let branch = code == "else:" || code.starts_with("elif ");
             let until = code.starts_with("until ");
             while stack.last().is_some_and(|f| indent <= f.indent) {
                 let frame = stack.pop().unwrap();
@@ -403,9 +409,7 @@ pub fn to_luau(source: &str) -> Result<String, String> {
                         "line {num}: expected an indented body (use pass for an empty block)"
                     ));
                 }
-                if frame.indent == indent
-                    && branch
-                    && matches!(frame.kind.as_str(), "if" | "elseif")
+                if frame.indent == indent && branch && matches!(frame.kind.as_str(), "if" | "elif")
                 {
                     break;
                 }
@@ -445,13 +449,16 @@ pub fn to_luau(source: &str) -> Result<String, String> {
                 let word = &m[start..i];
                 if start > 0
                     && bytes[start - 1] == b'@'
-                    && matches!(word, "let" | "def" | "global" | "pass")
+                    && matches!(word, "let" | "def" | "global" | "pass" | "elif")
                 {
                     edits.push((start - 1, start, String::new()));
                     continue;
                 }
                 if word == "let" && start == indent {
                     edits.push((start, i, "local".into()));
+                }
+                if word == "elif" {
+                    edits.push((start, i, "elseif".into()));
                 }
                 if word == "def" {
                     def_at = Some((start, i));
@@ -469,12 +476,12 @@ pub fn to_luau(source: &str) -> Result<String, String> {
             .to_string();
         let header_kind = matches!(
             kind.as_str(),
-            "if" | "elseif" | "else" | "for" | "while" | "do" | "repeat"
+            "if" | "elif" | "else" | "for" | "while" | "do" | "repeat"
         ) || def_at.is_some();
         if block && header_kind {
             let colon = m.rfind(':').unwrap();
             let suffix = match kind.as_str() {
-                "if" | "elseif" => " then",
+                "if" | "elif" => " then",
                 "for" | "while" => " do",
                 _ => "",
             };

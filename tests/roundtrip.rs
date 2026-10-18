@@ -113,3 +113,24 @@ fn arrays_reverse() {
     let nua = nua::from_luau("local xs = {1, 2}").unwrap();
     assert!(nua.contains("[1, 2]"));
 }
+
+#[test]
+fn elif_branches_in_both_directions() {
+    let source = "if x == 1:\n  print('one')\nelif x == 2:\n  print('two')\nelif (\n  x == 3\n):\n  print('three')\nelse:\n  print('other')\n";
+    let lua = nua::to_luau(source).unwrap();
+    assert!(lua.contains("elseif x == 2 then"));
+    let back = nua::from_luau(&lua).unwrap();
+    assert!(back.contains("elif x == 2:"));
+    assert!(!back.contains("elseif"));
+    roundtrip(&lua);
+}
+
+#[test]
+fn elif_expression_and_identifier() {
+    let source = "let label = if x then 1 elif y then 2 else 3\n";
+    let lua = nua::to_luau(source).unwrap();
+    assert!(lua.contains("elseif y then 2"));
+    assert!(nua::from_luau(&lua).unwrap().contains("elif y then 2"));
+    roundtrip("local elif = 1\nprint(elif)\nlocal t = {elif = elif}\nprint(t.elif)");
+    roundtrip("local label = if x then 1 elseif y then 2 else 3");
+}
