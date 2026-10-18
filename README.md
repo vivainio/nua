@@ -26,18 +26,17 @@ end
 
 ## Use
 
-Build with a current stable Rust toolchain (edition 2024):
+Install from this checkout with a current stable Rust toolchain (edition 2024):
 
 ```sh
-cargo build --release
-./target/release/nua to-luau examples/basics.nua -o /tmp/basics.luau
-./target/release/nua from-luau /tmp/basics.luau -o /tmp/basics.nua
+cargo install --path .
+
+nua to-luau examples/basics.nua -o /tmp/basics.luau
+nua from-luau /tmp/basics.luau -o /tmp/basics.nua
 
 # Read existing Lua using nua syntax:
-cat existing.lua | ./target/release/nua from-lua
+cat existing.lua | nua from-lua
 ```
-
-Or install from this checkout with `cargo install --path .`.
 
 ```
 nua <to-luau|to-lua|from-luau|from-lua|strip-types> [INPUT|-] [-o OUTPUT]
