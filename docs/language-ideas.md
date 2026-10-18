@@ -4,7 +4,7 @@ These are design candidates, not implemented syntax. Reviewed against the linked
 
 | Language | Relevant ideas | Possible fit for nua |
 | --- | --- | --- |
-| [MoonScript](https://moonscript.org/reference/) | Default arguments, destructuring, comprehensions, field shorthand | Small, explicit conveniences with readable Lua expansions |
+| [MoonScript](https://moonscript.org/reference/) | Default arguments, destructuring, comprehensions | Small, explicit conveniences with readable Lua expansions |
 | [YueScript](https://yuescript.org/doc/) | [Nil-coalescing](https://yuescript.org/doc/language-basics/operator.html), [destructuring](https://yuescript.org/doc/assignment/destructuring-assignment/), [bound-method stubs](https://yuescript.org/doc/functions/function-stubs/) | Address nil/false mistakes and callback boilerplate |
 | [Fennel](https://github.com/bakpakin/Fennel/blob/main/reference.md) | Sequential/dictionary table notation, destructuring, compile-time macros; a Lua reader called antifennel | Keep Lua interop and bidirectional reading central; defer macros |
 | [Teal](https://teal-language.org/) | Typed Lua compiled to ordinary Lua | Keep erasure distinct from type checking; reuse Luau's type system rather than inventing another |
@@ -17,12 +17,9 @@ def connect(host: string, port: number = 8080):
   ...
 
 -- Distinguish table destructuring from Lua's existing multiple returns.
-let {name, score} = user
+let {name = userName, score = userScore} = user
 let [first, second] = position
 let value, err = load()
-
--- Possible field shorthand: equivalent to {name = name, score = score}.
-let user = {name, score}
 
 -- Nil-coalescing; false remains false, and fallback is evaluated lazily.
 let enabled = settings.enabled ?? true
@@ -31,7 +28,7 @@ let enabled = settings.enabled ?? true
 let names = [user.name for _, user in ipairs(users) if user.active]
 ```
 
-Field shorthand above conflicts with today's positional brace literals (`{name, score}` is currently an array). It would need an explicit compatibility decision or different spelling; do not silently reinterpret existing nua.
+Field shorthand is excluded. Record construction uses explicit `key = value` fields, such as `{name = name, score = score}`. Any future record destructuring must also name keys explicitly. Positional brace literals retain their existing Lua meaning.
 
 Defaults and destructuring look like the best next additions. Nil-coalescing needs careful single evaluation and short-circuiting. Comprehensions need a decision about nil results, sequence length, and multiple returns. A bound-method operator would also need to specify whether the object and method are captured when the closure is created or looked up when called.
 

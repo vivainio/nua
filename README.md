@@ -85,7 +85,7 @@ Use spaces for indentation. Indentation width can vary between blocks, but sibli
 
 Luau type syntax stays intact: `{T}`, `{[string]: T}`, optional types, unions, intersections, generics, function types, type packs, `typeof`, and `::` assertions. Only a function definition's return annotation changes from `: T` to `-> T`. Function types already use `->`.
 
-Array literals create ordinary Lua tables, with one-based indexing. `items[1]` stays indexing. Records and dictionaries keep braces: `{name = "Ada"}` and `{[key] = value}`. The reverse converter renders tables containing only positional fields as arrays, including empty tables. Mixed tables keep braces. Table-call shorthand such as `print {1, 2}` also keeps braces.
+Array literals create ordinary Lua tables, with one-based indexing. `items[1]` stays indexing. Records and dictionaries keep braces: `{name = "Ada"}` and `{[key] = value}`. Record fields always use explicit `key = value`; there is no field shorthand. The reverse converter renders tables containing only positional fields as arrays, including empty tables. Mixed tables keep braces. Table-call shorthand such as `print {1, 2}` also keeps braces.
 
 Lua long strings remain supported. `[[...]]` is reserved for a long string, so separate nested list openers with a space: `[ [1, 2], [3, 4] ]`. The reverse converter inserts this space automatically.
 
